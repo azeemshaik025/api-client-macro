@@ -1,7 +1,7 @@
 //! Generate HTTP client methods from endpoint definitions.
 //!
 //! ```ignore
-//! use http_provider_macro::http_provider;
+//! use api_client_macro::api_client;
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Serialize, Deserialize)]
@@ -10,7 +10,7 @@
 //!     name: String,
 //! }
 //!
-//! http_provider!(
+//! api_client!(
 //!     UserApi,
 //!     {
 //!         {
@@ -40,8 +40,8 @@
 
 extern crate proc_macro;
 
-use crate::expanders::HttpProviderExpander;
-use crate::input::HttpProviderInput;
+use crate::expanders::ApiClientExpander;
+use crate::input::ApiClientInput;
 use syn::parse_macro_input;
 
 mod error;
@@ -49,10 +49,10 @@ mod expanders;
 mod input;
 
 #[proc_macro]
-pub fn http_provider(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as HttpProviderInput);
-    match HttpProviderExpander::new(input).expand() {
+pub fn api_client(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input = parse_macro_input!(input as ApiClientInput);
+    match ApiClientExpander::new(input).expand() {
         Ok(tokens) => tokens.into(),
-        Err(err) => err.to_compile_error().into(),
+        Err(err) => err.into_compile_error().into(),
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
     error::MacroResult,
-    input::{EndpointDef, HttpMethod},
+    input::{AuthStrategy, EndpointDef, HttpMethod},
 };
 use heck::ToSnakeCase;
 use proc_macro2::{Span, TokenStream};
@@ -13,11 +13,23 @@ const PATH_PARAM_REGEX: &str = r"\{([a-zA-Z0-9_]+)\}";
 pub struct MethodExpander<'a> {
     def: &'a EndpointDef,
     error_name: &'a Ident,
+    retry_count: u32,
+    auth: Option<&'a AuthStrategy>,
 }
 
 impl<'a> MethodExpander<'a> {
-    pub fn new(def: &'a EndpointDef, error_name: &'a Ident) -> Self {
-        Self { def, error_name }
+    pub fn new(
+        def: &'a EndpointDef,
+        error_name: &'a Ident,
+        retry_count: u32,
+        auth: Option<&'a AuthStrategy>,
+    ) -> Self {
+        Self {
+            def,
+            error_name,
+            retry_count,
+            auth,
+        }
     }
 
     pub fn expand(&self) -> MacroResult<TokenStream> {
@@ -32,15 +44,85 @@ impl<'a> MethodExpander<'a> {
         let error_name = self.error_name;
 
         let url_construction = UrlExpander::new(self.def, self.error_name).expand();
-        let request_builder = RequestExpander::new(self.def).expand();
-        let response_handler =
-            ResponseExpander::new(self.def.res.as_ref(), self.error_name).expand();
+        let request_builder = RequestExpander::new(self.def, self.auth).expand();
+        let deserialize = ResponseExpander::new(self.def.res.as_ref(), self.error_name).expand();
+
+        let body = if self.retry_count > 0 {
+            let max_retries = self.retry_count;
+            quote! {
+                #url_construction
+                let mut __attempt: u32 = 0;
+                loop {
+                    #request_builder
+                    let __response = request.send().await;
+                    match __response {
+                        Err(err) => {
+                            if __attempt < #max_retries && err.is_timeout() {
+                                __attempt += 1;
+                                let __delay = std::cmp::min(
+                                    100u64 * (1u64 << __attempt),
+                                    5000u64,
+                                );
+                                tokio::time::sleep(
+                                    std::time::Duration::from_millis(__delay),
+                                )
+                                .await;
+                                continue;
+                            }
+                            return Err(#error_name::from(err));
+                        }
+                        Ok(response) => {
+                            let status = response.status();
+                            if !status.is_success() {
+                                if __attempt < #max_retries && status.is_server_error() {
+                                    __attempt += 1;
+                                    let __delay = std::cmp::min(
+                                        100u64 * (1u64 << __attempt),
+                                        5000u64,
+                                    );
+                                    tokio::time::sleep(
+                                        std::time::Duration::from_millis(__delay),
+                                    )
+                                    .await;
+                                    continue;
+                                }
+                                let reason = status
+                                    .canonical_reason()
+                                    .unwrap_or("Unknown")
+                                    .to_string();
+                                return Err(#error_name::Http {
+                                    status: status.as_u16(),
+                                    reason,
+                                });
+                            }
+                            break #deserialize;
+                        }
+                    }
+                }
+            }
+        } else {
+            quote! {
+                #url_construction
+                #request_builder
+                let response = request.send().await.map_err(#error_name::from)?;
+                let status = response.status();
+                if !status.is_success() {
+                    let reason = status
+                        .canonical_reason()
+                        .unwrap_or("Unknown")
+                        .to_string();
+                    return Err(#error_name::Http {
+                        status: status.as_u16(),
+                        reason,
+                    });
+                }
+                #deserialize
+            }
+        };
 
         Ok(quote! {
             async fn #fn_name(&self, #(#params),*) -> Result<#res, #error_name> {
-                #url_construction
-                #request_builder
-                #response_handler
+                #body
             }
         })
     }
@@ -204,11 +286,12 @@ impl<'a> UrlExpander<'a> {
 
 pub struct RequestExpander<'a> {
     def: &'a EndpointDef,
+    auth: Option<&'a AuthStrategy>,
 }
 
 impl<'a> RequestExpander<'a> {
-    pub fn new(def: &'a EndpointDef) -> Self {
-        Self { def }
+    pub fn new(def: &'a EndpointDef, auth: Option<&'a AuthStrategy>) -> Self {
+        Self { def, auth }
     }
 
     pub fn expand(&self) -> TokenStream {
@@ -223,15 +306,32 @@ impl<'a> RequestExpander<'a> {
 
     fn expand_method_call(&self) -> TokenStream {
         match self.def.method {
-            HttpMethod::GET => quote! { self.client.get(url) },
-            HttpMethod::POST => quote! { self.client.post(url) },
-            HttpMethod::PUT => quote! { self.client.put(url) },
-            HttpMethod::DELETE => quote! { self.client.delete(url) },
+            HttpMethod::GET => quote! { self.client.get(url.clone()) },
+            HttpMethod::POST => quote! { self.client.post(url.clone()) },
+            HttpMethod::PUT => quote! { self.client.put(url.clone()) },
+            HttpMethod::DELETE => quote! { self.client.delete(url.clone()) },
+            HttpMethod::PATCH => quote! { self.client.patch(url.clone()) },
         }
     }
 
     fn expand_modifications(&self) -> Vec<TokenStream> {
         let mut modifications = Vec::new();
+
+        match self.auth {
+            Some(AuthStrategy::Bearer) => {
+                modifications.push(quote! { request = request.bearer_auth(&self.token); });
+            }
+            Some(AuthStrategy::Basic) => {
+                modifications.push(
+                    quote! { request = request.basic_auth(&self.username, Some(&self.password)); },
+                );
+            }
+            Some(AuthStrategy::ApiKey(ref header_name)) => {
+                modifications
+                    .push(quote! { request = request.header(#header_name, &self.api_key); });
+            }
+            None => {}
+        }
 
         if self.def.req.is_some() {
             modifications.push(quote! { request = request.json(body); });
@@ -240,7 +340,7 @@ impl<'a> RequestExpander<'a> {
             modifications.push(quote! { request = request.query(query_params); });
         }
         if self.def.headers.is_some() {
-            modifications.push(quote! { request = request.headers(headers); });
+            modifications.push(quote! { request = request.headers(headers.clone()); });
         }
 
         modifications
@@ -259,26 +359,7 @@ impl<'a> ResponseExpander<'a> {
 
     pub fn expand(&self) -> TokenStream {
         let error_name = self.error_name;
-
-        let response = quote! {
-            let response = request
-                .send()
-                .await
-                .map_err(#error_name::from)?;
-        };
-
-        let handle_error = quote! {
-            let status = response.status();
-            if !status.is_success() {
-                let reason = status.canonical_reason().unwrap_or("Unknown").to_string();
-                return Err(#error_name::Http {
-                    status: status.as_u16(),
-                    reason,
-                });
-            }
-        };
-
-        let deserialized_response = match self.res {
+        match self.res {
             Some(res) => quote! {
                 response
                     .json::<#res>()
@@ -288,12 +369,6 @@ impl<'a> ResponseExpander<'a> {
             None => quote! {
                 Ok(())
             },
-        };
-
-        quote! {
-            #response
-            #handle_error
-            #deserialized_response
         }
     }
 }

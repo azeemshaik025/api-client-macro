@@ -1,7 +1,7 @@
 use proc_macro2::Span;
 use syn::Error as SynError;
 
-/// Custom error types for the HTTP provider macro.
+/// Custom error types for the API client macro.
 ///
 /// This enum represents the different types of errors that can occur
 /// during macro expansion and code generation.
@@ -19,7 +19,7 @@ impl MacroError {
     ///
     /// # Returns
     /// * `proc_macro2::TokenStream` - A token stream representing the error message
-    pub fn to_compile_error(self) -> proc_macro2::TokenStream {
+    pub fn into_compile_error(self) -> proc_macro2::TokenStream {
         match self {
             MacroError::Syn(err) => err.to_compile_error(),
             MacroError::NoEndpointsConfigured { span } => {

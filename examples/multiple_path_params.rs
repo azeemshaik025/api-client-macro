@@ -3,7 +3,7 @@
 //! When you have multiple path parameters like `/users/{user_id}/posts/{post_id}`,
 //! the generated function name will be: `get_users_by_user_id_posts_by_post_id`
 
-use http_provider_macro::http_provider;
+use api_client_macro::api_client;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 
@@ -22,8 +22,8 @@ struct UserPostPathParams {
     post_id: u32,
 }
 
-// Define provider with multiple path parameters
-http_provider!(
+// Define an API client with multiple path parameters
+api_client!(
     ApiClient,
     {
         {

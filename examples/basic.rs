@@ -1,9 +1,9 @@
-//! Basic example demonstrating minimal usage of the `http_provider` macro.
+//! Basic example demonstrating minimal usage of the `api_client` macro.
 //!
-//! This example shows the simplest way to create an HTTP client provider
+//! This example shows the simplest way to create an HTTP API client
 //! with just the essential fields: `method`, `path`, and `res`.
 
-use http_provider_macro::http_provider;
+use api_client_macro::api_client;
 use reqwest::Url;
 use serde::Deserialize;
 
@@ -22,8 +22,8 @@ struct Post {
     content: String,
 }
 
-// Define your HTTP provider with minimal configuration
-http_provider!(
+// Define your API client with minimal configuration
+api_client!(
     ApiClient,
     {
         {

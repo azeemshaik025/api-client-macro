@@ -1,10 +1,10 @@
-//! Example demonstrating how to mock the generated HTTP provider for testing.
+//! Example demonstrating how to mock the generated API client for testing.
 //!
-//! The `http_provider` macro generates a trait (e.g., `ApiClientTrait`) that
-//! the provider struct implements. You can implement this trait yourself to
-//! create mock providers for testing without making actual HTTP requests.
+//! The `api_client` macro generates a trait (e.g., `ApiClientTrait`) that
+//! the client struct implements. You can implement this trait yourself to
+//! create mock clients for testing without making actual HTTP requests.
 
-use http_provider_macro::http_provider;
+use api_client_macro::api_client;
 use serde::{Deserialize, Serialize};
 
 // Response type
@@ -21,8 +21,8 @@ struct UserPathParams {
     id: u32,
 }
 
-// Define the provider with a single endpoint
-http_provider!(
+// Define the client with a single endpoint
+api_client!(
     ApiClient,
     {
         {
@@ -34,7 +34,7 @@ http_provider!(
     }
 );
 
-// Mock provider implementing the generated trait
+// Mock client implementing the generated trait
 struct MockProvider;
 
 impl ApiClientTrait for MockProvider {
@@ -46,7 +46,7 @@ impl ApiClientTrait for MockProvider {
     }
 }
 
-// Function that works with any provider implementing the trait
+// Function that works with any client implementing the trait
 async fn get_user_name<P: ApiClientTrait>(
     provider: &P,
     user_id: u32,
@@ -59,7 +59,7 @@ async fn get_user_name<P: ApiClientTrait>(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Use the mock provider
+    // Use the mock client
     let mock = MockProvider;
     let user = mock.get_users_by_id(&UserPathParams { id: 42 }).await?;
     println!("Mock user: {:?}", user);
@@ -68,7 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let name = get_user_name(&mock, 42).await?;
     println!("User name: {}", name);
 
-    // The same function works with the real provider too:
+    // The same function works with the real client too:
     // let base_url = reqwest::Url::parse("https://api.example.com")?;
     // let real_client = ApiClient::new(base_url, Some(5000));
     // let name = get_user_name(&real_client, 42).await?;

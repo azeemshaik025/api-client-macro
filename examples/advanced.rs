@@ -1,4 +1,4 @@
-//! Comprehensive example demonstrating all features of the `http_provider` macro.
+//! Comprehensive example demonstrating all features of the `api_client` macro.
 //!
 //! This example shows:
 //! - Request bodies (`req`)
@@ -9,7 +9,7 @@
 //! - Optional response types (omitting `res` returns `()`)
 //! - Endpoints without paths
 
-use http_provider_macro::http_provider;
+use api_client_macro::api_client;
 use reqwest::{header::HeaderMap, Url};
 use serde::{Deserialize, Serialize};
 
@@ -62,8 +62,8 @@ struct SearchQueryParams {
     limit: Option<u32>,
 }
 
-// Define provider with all features
-http_provider!(
+// Define an API client with all features
+api_client!(
     ApiClient,
     {
         // Basic GET with path and response
