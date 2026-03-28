@@ -9,7 +9,7 @@
 //! - Optional response types (omitting `res` returns `()`)
 //! - Endpoints without paths
 
-use api_client_macro::api_client;
+use http_provider_macro::api_client;
 use reqwest::{header::HeaderMap, Url};
 use serde::{Deserialize, Serialize};
 

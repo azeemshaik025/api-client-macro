@@ -1,7 +1,7 @@
 //! Generate HTTP client methods from endpoint definitions.
 //!
 //! ```ignore
-//! use api_client_macro::api_client;
+//! use http_provider_macro::api_client;
 //! use serde::{Deserialize, Serialize};
 //!
 //! #[derive(Serialize, Deserialize)]
@@ -48,11 +48,20 @@ mod error;
 mod expanders;
 mod input;
 
-#[proc_macro]
-pub fn api_client(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+fn expand_macro(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as ApiClientInput);
     match ApiClientExpander::new(input).expand() {
         Ok(tokens) => tokens.into(),
         Err(err) => err.into_compile_error().into(),
     }
+}
+
+#[proc_macro]
+pub fn api_client(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    expand_macro(input)
+}
+
+#[proc_macro]
+pub fn http_provider(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    expand_macro(input)
 }

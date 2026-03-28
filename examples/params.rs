@@ -3,7 +3,7 @@
 //! This example shows how to use `path_params` for dynamic URL segments
 //! and `query_params` for query string parameters.
 
-use api_client_macro::api_client;
+use http_provider_macro::api_client;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 

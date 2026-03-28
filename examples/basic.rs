@@ -3,7 +3,7 @@
 //! This example shows the simplest way to create an HTTP API client
 //! with just the essential fields: `method`, `path`, and `res`.
 
-use api_client_macro::api_client;
+use http_provider_macro::api_client;
 use reqwest::Url;
 use serde::Deserialize;
 

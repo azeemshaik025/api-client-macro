@@ -5,8 +5,10 @@ A procedural macro for generating type-safe API clients in Rust.
 ## Install
 
 ```sh
-cargo add api-client-macro
+cargo add http-provider-macro
 ```
+
+The crate remains published as `http-provider-macro`, and the recommended macro is `api_client!`.
 
 You'll also need these dependencies:
 
@@ -19,7 +21,7 @@ cargo add tokio --features full
 ## Usage
 
 ```rust
-use api_client_macro::api_client;
+use http_provider_macro::api_client;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize)]

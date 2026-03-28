@@ -4,7 +4,7 @@
 //! the client struct implements. You can implement this trait yourself to
 //! create mock clients for testing without making actual HTTP requests.
 
-use api_client_macro::api_client;
+use http_provider_macro::api_client;
 use serde::{Deserialize, Serialize};
 
 // Response type

@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use api_client_macro::api_client;
+    use http_provider_macro::{api_client, http_provider};
     use reqwest::{header::HeaderMap, Url};
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
@@ -74,6 +74,35 @@ mod tests {
     }
 
     // Basic functionality tests
+    #[tokio::test]
+    async fn test_http_provider_macro_alias() -> Result<(), Box<dyn std::error::Error>> {
+        http_provider!(
+            AliasProvider,
+            {
+                {
+                    path: "/alias",
+                    method: GET,
+                    res: MyResponse,
+                },
+            }
+        );
+
+        let mock_server = MockServer::start().await;
+        let response = create_success_response("alias-ok");
+
+        Mock::given(method("GET"))
+            .and(wiremock::matchers::path("/alias"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(response))
+            .mount(&mock_server)
+            .await;
+
+        let provider = AliasProvider::new(Url::from_str(&mock_server.uri())?, Some(5000));
+        let result = provider.get_alias().await?;
+
+        assert_eq!(result.value, "alias-ok");
+        Ok(())
+    }
+
     #[tokio::test]
     async fn test_get_with_path() -> Result<(), Box<dyn std::error::Error>> {
         let mock_server = MockServer::start().await;
